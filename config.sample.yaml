@@ -44,8 +44,9 @@ gemini:
     # Google Gemini official native API; use exact IDs returned by /v1beta/models.
     - name: "google-official"
       models:
-        - "gemini-2.5-flash-lite"
-        - "gemini-2.5-flash"
+        - "gemini-3.1-flash-lite"
+        - "gemini-3.1-flash-lite-preview"
+        - "gemini-3.6-flash"
       endpoints:
         - url: "https://generativelanguage.googleapis.com/v1beta"
           api_key: "YOUR_GOOGLE_GEMINI_API_KEY_1"
