@@ -1,0 +1,22 @@
+# Secrets and runtime configuration
+config.yaml
+.env
+.env.*
+dynamic_rules.json
+runtime_settings.json
+
+# Telegram credentials/session files
+*.session
+*.session-journal
+
+# Local model and generated files
+lid.176.bin
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.log
+
+# Local/editor/system files
+.DS_Store
+.idea/
+.vscode/
