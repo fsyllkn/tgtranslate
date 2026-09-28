@@ -43,9 +43,12 @@ class TelegramBot:
         self._global_limit = 29  # 全局每秒
         self._global_window = 1  # 秒
 
-    async def send_reply(self, event, text):
+    async def send_reply(self, event, text, reply_to=None):
         """
-        速率限制下安全发送消息
+        速率限制下安全发送消息。
+
+        ``reply_to`` 用于需要回复指定消息的场景（例如 .fy-now），
+        不传时保持原有的回复当前事件消息行为。
         """
         group_id = str(getattr(event, "chat_id", ""))
         now = time.time()
@@ -65,7 +68,12 @@ class TelegramBot:
             await asyncio.sleep(0.1)
             now = time.time()
         try:
-            await event.reply(text)
+            if reply_to is None:
+                await event.reply(text)
+            else:
+                await event.client.send_message(
+                    event.chat_id, text, reply_to=reply_to
+                )
             logger.info("[TelegramBot] 回复消息成功（速率限制已检查）")
         except Exception as e:
             logger.error(f"[TelegramBot] 回复消息失败: {e}")

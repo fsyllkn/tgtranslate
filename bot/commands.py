@@ -22,6 +22,7 @@ class CommandDispatcher:
         self.commands = {
             ".fy-reload": self._handle_reload,
             ".fy-main": self._handle_main,
+            ".fy-now": self._handle_now,
             ".fy-list": self._handle_list,
             ".fy-clear": self._handle_clear,
             ".fy-help": self._handle_help,
@@ -195,6 +196,7 @@ class CommandDispatcher:
         msg = (
             "指令帮助：\n"
             "- `.fy-main` 查看默认主语言；`.fy-main,zh` 设置；`.fy-main,off` 关闭主语言模式；\n"
+            "- `.fy-now` 回复一条消息，临时翻译成默认主语言；自己的消息优先直接编辑，编辑失败则回复译文；\n"
             "`.fy-on/off` 对自己，`.fy-add/del` 对其他用户：\n"
             "- `.fy-on` 私聊、群聊-按“非主语言→主语言”翻译自己的消息；\n"
             "- `.fy-off` 私聊、群聊-关闭自己翻译功能；`.fy-off,primary` 仅关闭主语言规则；\n"
@@ -215,6 +217,96 @@ class CommandDispatcher:
         )
         from .utils import send_ephemeral_reply
         await send_ephemeral_reply(event, msg)
+
+    async def _handle_now(self, event, args):
+        """对被回复消息执行一次性翻译，不读取或修改任何翻译规则。"""
+        from .utils import send_ephemeral_reply
+
+        if args:
+            await send_ephemeral_reply(event, "用法：回复一条消息后发送 `.fy-now`。该命令不支持修改翻译规则。")
+            return
+
+        command_message = getattr(event, "message", None)
+        target_message = None
+        try:
+            if command_message is not None and hasattr(command_message, "get_reply_message"):
+                target_message = await command_message.get_reply_message()
+            elif hasattr(event, "get_reply_message"):
+                target_message = await event.get_reply_message()
+        except Exception as exc:
+            logger.warning("[CommandDispatcher] 获取 .fy-now 被回复消息失败: %s", exc)
+
+        if target_message is None:
+            await send_ephemeral_reply(event, "请回复一条需要翻译的文字消息后再发送 `.fy-now`。")
+            return
+
+        # raw_text 同时覆盖普通文字和带字幕的媒体消息；没有文字的媒体不参与翻译。
+        source_text = getattr(target_message, "raw_text", None)
+        if source_text is None:
+            source_text = getattr(target_message, "text", None)
+        source_text = (source_text or "").strip()
+        if not source_text:
+            await send_ephemeral_reply(event, "被回复的消息没有可翻译文字或字幕。")
+            return
+
+        primary_language = str(
+            getattr(self.bot.runtime_settings, "primary_language", "zh") or "zh"
+        ).lower()
+        prefer = self.bot.config_manager.get("default_translate_source", "deeplx")
+        try:
+            translated_map = await self.bot.translation_service.translate(
+                source_text,
+                "auto",
+                [primary_language],
+                prefer=prefer,
+                task="full_translation",
+            )
+        except Exception as exc:
+            logger.exception("[CommandDispatcher] .fy-now 翻译异常")
+            await send_ephemeral_reply(event, f"临时翻译失败：{exc}")
+            return
+
+        translated = (translated_map or {}).get(primary_language, "")
+        translated = (translated or "").strip()
+        if not translated or translated.startswith("[翻译失败]"):
+            await send_ephemeral_reply(event, translated or "临时翻译失败，请稍后重试。")
+            return
+        if translated == source_text:
+            await send_ephemeral_reply(event, "翻译结果与原文相同，无需修改。")
+            return
+
+        # 命令由当前账号发出；优先依据 sender_id 判断目标消息是否为己方消息，
+        # out=True 作为频道/特殊消息场景下的补充判断。
+        operator_id = getattr(event, "sender_id", None)
+        target_sender_id = getattr(target_message, "sender_id", None)
+        is_own_message = (
+            operator_id is not None
+            and target_sender_id is not None
+            and int(operator_id) == int(target_sender_id)
+        ) or bool(getattr(target_message, "out", False))
+
+        if is_own_message:
+            try:
+                await target_message.edit(translated)
+                logger.info("[CommandDispatcher] .fy-now 已编辑己方消息 id=%s", getattr(target_message, "id", None))
+                return
+            except Exception as exc:
+                # Telegram 可能因消息不可编辑、媒体类型或时间限制拒绝编辑，
+                # 此时按普通临时翻译回复，确保功能仍然可用。
+                logger.warning(
+                    "[CommandDispatcher] .fy-now 编辑己方消息失败，回退为回复: %s", exc
+                )
+
+        try:
+            await self.bot.send_reply(
+                event,
+                translated,
+                reply_to=getattr(target_message, "id", None),
+            )
+            logger.info("[CommandDispatcher] .fy-now 已回复临时译文")
+        except Exception as exc:
+            logger.exception("[CommandDispatcher] .fy-now 回复译文失败")
+            await send_ephemeral_reply(event, f"临时翻译结果发送失败：{exc}")
 
     async def _handle_main(self, event, args):
         """查看、设置或关闭默认主语言。"""
