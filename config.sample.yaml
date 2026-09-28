@@ -41,26 +41,20 @@ gemini:
   timeout: 30
   max_retries: 3
   model_groups:
-    # Native Gemini endpoint; use exact IDs returned by /v1beta/models.
-    - name: "cpa-gemini"
+    # Google Gemini official native API; use exact IDs returned by /v1beta/models.
+    - name: "google-official"
       models:
-        - "Gemini 3.5 Flash Lite"
-        - "Gemini Flash-Lite Latest"
-        - "Gemini 3.6 Flash"
-        - "Gemini 3.1 Flash Lite"
-        - "Gemini 3.5 Flash"
+        - "gemini-2.5-flash-lite"
+        - "gemini-2.5-flash"
       endpoints:
-        - url: "https://cpa.example.com/v1beta"
-          api_key: "YOUR_CPA_API_KEY"
-
-    - name: "sub-gemini"
-      models:
-        - "gemini-3.5-flash-lite"
-        - "gemini-flash-lite-latest"
-        - "gemini-3.1-flash-lite"
-      endpoints:
-        - url: "https://sub.example.com/v1beta"
-          api_key: "YOUR_SUB_GEMINI_API_KEY"
+        - url: "https://generativelanguage.googleapis.com/v1beta"
+          api_key: "YOUR_GOOGLE_GEMINI_API_KEY_1"
+        - url: "https://generativelanguage.googleapis.com/v1beta"
+          api_key: "YOUR_GOOGLE_GEMINI_API_KEY_2"
+        - url: "https://generativelanguage.googleapis.com/v1beta"
+          api_key: "YOUR_GOOGLE_GEMINI_API_KEY_3"
+        - url: "https://generativelanguage.googleapis.com/v1beta"
+          api_key: "YOUR_GOOGLE_GEMINI_API_KEY_4"
 
 # An endpoint is disabled after all its models fail this many consecutive times.
 deeplx_fail_threshold: 2
