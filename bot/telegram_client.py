@@ -88,8 +88,10 @@ class TelegramBot:
             text = getattr(event.message, "text", "")
             # 兼容全角句号，统一转换为半角
             text_check = text.replace("。", ".") if text else text
-            # 判断是否为命令
-            if text_check and text_check.strip().startswith(".fy-"):
+            # .fy 与 .fy-now 都是临时翻译命令；只匹配完整命令前缀，
+            # 避免把普通文本（如 .fyfoo）误判为命令。
+            first_token = text_check.strip().split(maxsplit=1)[0].lower() if text_check and text_check.strip() else ""
+            if first_token == ".fy" or first_token.startswith(".fy-"):
                 logger.info("[TelegramBot] 识别为命令，分发处理")
                 await self.command_dispatcher.dispatch(event)
             else:
@@ -101,7 +103,8 @@ class TelegramBot:
         普通消息的自动翻译主流程
         """
         text = getattr(event.message, "text", "")
-        if not text or text.strip().startswith(".fy-"):
+        normalized_first = text.replace("。", ".").strip().split(maxsplit=1)[0].lower() if text and text.strip() else ""
+        if not text or normalized_first == ".fy" or normalized_first.startswith(".fy-"):
             return
         from .utils import should_ignore, build_ignore_patterns
         ignore_words = self.config_manager.get("ignore_words", [])

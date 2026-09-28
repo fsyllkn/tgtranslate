@@ -23,6 +23,7 @@ class CommandDispatcher:
             ".fy-reload": self._handle_reload,
             ".fy-main": self._handle_main,
             ".fy-now": self._handle_now,
+            ".fy": self._handle_now,
             ".fy-list": self._handle_list,
             ".fy-clear": self._handle_clear,
             ".fy-help": self._handle_help,
@@ -45,12 +46,13 @@ class CommandDispatcher:
         import re
         text = re.sub(r"[, ]+", " ", text)
         parts = text.strip().split()
-        cmd = parts[0]
+        # 命令大小写不敏感，便于 .fy、.FY、。fy 等写法统一处理。
+        cmd = parts[0].lower()
         args = parts[1:]
         handler = self.commands.get(cmd)
         import traceback
 
-        # 权限控制：所有.fy-指令仅允许白名单用户
+        # 权限控制：所有.fy 指令仅允许白名单用户
         config_manager = getattr(self.bot, "config_manager", None)
         my_tg_ids = set()
         if config_manager:
@@ -196,7 +198,7 @@ class CommandDispatcher:
         msg = (
             "指令帮助：\n"
             "- `.fy-main` 查看默认主语言；`.fy-main,zh` 设置；`.fy-main,off` 关闭主语言模式；\n"
-            "- `.fy-now` 回复一条消息，临时翻译成默认主语言；优先编辑本指令显示译文，编辑失败则回复译文；\n"
+            "- `.fy` / `.fy-now` 回复一条消息，临时翻译成默认主语言；优先编辑本指令显示译文，编辑失败则回复译文；\n"
             "`.fy-on/off` 对自己，`.fy-add/del` 对其他用户：\n"
             "- `.fy-on` 私聊、群聊-按“非主语言→主语言”翻译自己的消息；\n"
             "- `.fy-off` 私聊、群聊-关闭自己翻译功能；`.fy-off,primary` 仅关闭主语言规则；\n"
@@ -223,7 +225,7 @@ class CommandDispatcher:
         from .utils import send_ephemeral_reply
 
         if args:
-            await send_ephemeral_reply(event, "用法：回复一条消息后发送 `.fy-now`。该命令不支持修改翻译规则。")
+            await send_ephemeral_reply(event, "用法：回复一条消息后发送 `.fy` 或 `.fy-now`。该命令不支持修改翻译规则。")
             return
 
         command_message = getattr(event, "message", None)
@@ -237,7 +239,7 @@ class CommandDispatcher:
             logger.warning("[CommandDispatcher] 获取 .fy-now 被回复消息失败: %s", exc)
 
         if target_message is None:
-            await send_ephemeral_reply(event, "请回复一条需要翻译的文字消息后再发送 `.fy-now`。")
+            await send_ephemeral_reply(event, "请回复一条需要翻译的文字消息后再发送 `.fy` 或 `.fy-now`。")
             return
 
         # raw_text 同时覆盖普通文字和带字幕的媒体消息；没有文字的媒体不参与翻译。
