@@ -187,6 +187,17 @@ class TelegramBot:
             ):
                 # 单条多行，整体用代码块
                 reply_text = f"```\n{reply_text.strip()}\n```"
+            # 有规则的己方消息优先直接编辑原消息；这只适用于自动规则翻译。
+            # .fy-now 的己方消息由命令处理器编辑指令消息本身，避免改写原文。
+            if bool(getattr(event.message, "out", False)):
+                try:
+                    await event.message.edit(reply_text.strip())
+                    logger.info("[TelegramBot] 己方规则消息已编辑原消息完成翻译")
+                    return
+                except Exception as e:
+                    logger.warning(
+                        f"[TelegramBot] 编辑己方规则消息失败，回退为回复翻译: {e}"
+                    )
             try:
                 await self.send_reply(event, reply_text.strip())
                 logger.info("[TelegramBot] 回复翻译结果成功")

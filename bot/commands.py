@@ -196,7 +196,7 @@ class CommandDispatcher:
         msg = (
             "指令帮助：\n"
             "- `.fy-main` 查看默认主语言；`.fy-main,zh` 设置；`.fy-main,off` 关闭主语言模式；\n"
-            "- `.fy-now` 回复一条消息，临时翻译成默认主语言；自己的消息优先直接编辑，编辑失败则回复译文；\n"
+            "- `.fy-now` 回复一条消息，临时翻译成默认主语言；回复己方消息时优先编辑本指令，编辑失败则回复译文；\n"
             "`.fy-on/off` 对自己，`.fy-add/del` 对其他用户：\n"
             "- `.fy-on` 私聊、群聊-按“非主语言→主语言”翻译自己的消息；\n"
             "- `.fy-off` 私聊、群聊-关闭自己翻译功能；`.fy-off,primary` 仅关闭主语言规则；\n"
@@ -287,14 +287,21 @@ class CommandDispatcher:
 
         if is_own_message:
             try:
-                await target_message.edit(translated)
-                logger.info("[CommandDispatcher] .fy-now 已编辑己方消息 id=%s", getattr(target_message, "id", None))
+                # 临时翻译不能改写被回复的原消息；把本次指令消息替换为译文，
+                # 这样既保留原文，又能在聊天中直接看到临时译文。
+                if command_message is None or not hasattr(command_message, "edit"):
+                    raise RuntimeError("临时翻译指令消息不可编辑")
+                await command_message.edit(translated)
+                logger.info(
+                    "[CommandDispatcher] .fy-now 已编辑指令消息 id=%s",
+                    getattr(command_message, "id", None),
+                )
                 return
             except Exception as exc:
                 # Telegram 可能因消息不可编辑、媒体类型或时间限制拒绝编辑，
                 # 此时按普通临时翻译回复，确保功能仍然可用。
                 logger.warning(
-                    "[CommandDispatcher] .fy-now 编辑己方消息失败，回退为回复: %s", exc
+                    "[CommandDispatcher] .fy-now 编辑指令消息失败，回退为回复: %s", exc
                 )
 
         try:
