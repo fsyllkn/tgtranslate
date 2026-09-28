@@ -1,0 +1,155 @@
+# Copy this file to config.yaml and replace every YOUR_* placeholder.
+# config.yaml contains secrets and is intentionally excluded from Git.
+
+telegram:
+  api_id: 12345678
+  api_hash: "YOUR_TELEGRAM_API_HASH"
+  session_name: "translate"
+  my_tg_ids:
+    - 123456789
+
+# Default translation source: gemini, openai, or deeplx
+default_translate_source: "gemini"
+
+# Fallback order after the preferred engine fails.
+translation_engine_order:
+  - "gemini"
+  - "openai"
+
+deeplx:
+  enabled: false
+  base_urls:
+    - "https://your-deeplx-endpoint-1/translate"
+    - "https://your-deeplx-endpoint-2/translate"
+
+openai:
+  model_groups:
+    # Keep only models supported by this endpoint.
+    - name: "cpa-openai"
+      models: ["gpt-5.6-luna"]
+      endpoints:
+        - url: "https://cpa.example.com/v1"
+          api_key: "YOUR_CPA_API_KEY"
+
+    - name: "sub-openai"
+      models: ["gpt-5.6-luna", "gpt-5.4-mini", "gpt-4o"]
+      endpoints:
+        - url: "https://sub.example.com/v1"
+          api_key: "YOUR_SUB_API_KEY"
+
+gemini:
+  timeout: 30
+  max_retries: 3
+  model_groups:
+    # Native Gemini endpoint; use exact IDs returned by /v1beta/models.
+    - name: "cpa-gemini"
+      models:
+        - "Gemini 3.5 Flash Lite"
+        - "Gemini Flash-Lite Latest"
+        - "Gemini 3.6 Flash"
+        - "Gemini 3.1 Flash Lite"
+        - "Gemini 3.5 Flash"
+      endpoints:
+        - url: "https://cpa.example.com/v1beta"
+          api_key: "YOUR_CPA_API_KEY"
+
+    - name: "sub-gemini"
+      models:
+        - "gemini-3.5-flash-lite"
+        - "gemini-flash-lite-latest"
+        - "gemini-3.1-flash-lite"
+      endpoints:
+        - url: "https://sub.example.com/v1beta"
+          api_key: "YOUR_SUB_GEMINI_API_KEY"
+
+# An endpoint is disabled after all its models fail this many consecutive times.
+deeplx_fail_threshold: 2
+openai_fail_threshold: 2
+gemini_fail_threshold: 2
+
+fasttext:
+  enabled: true
+  confidence_threshold: 0.8
+  fallback_enabled: true
+  model_path: "lid.176.bin"
+
+lang_detect_short_text_unknown: true
+lang_detect_proper_nouns:
+  - openwebui
+  - chatgpt
+  - midjourney
+  - gpt
+  - sdwebui
+  - stable-diffusion
+
+language_detection:
+  primary_language: "zh"
+  primary_mode_enabled: true
+  # Prefer Chinese for Han-only text without Japanese kana.
+  han_only:
+    enabled: true
+    language: "zh"
+    confidence: 0.86
+  foreign_span:
+    enabled: true
+    min_words: 2
+    min_chars: 6
+    confidence_threshold: 0.75
+    same_script_window_words: 4
+    translate_single_unknown_word: false
+    common_terms:
+      zh: ["ok", "okay", "openai", "telegram", "api", "app"]
+      en: ["ok", "okay", "openai", "telegram", "api", "app"]
+
+self_default_rule: "3"
+other_default_rule: "3"
+
+translate_rules:
+  "1": "zh,en"
+  "2": "en,zh"
+  "3": "zh|en,zh|en"
+  "4": "ru|ar,zh"
+  "5": "fr|ru,en|zh"
+  "6": "fr|ru|en,en|zh"
+  "7": "*,en|zh"
+  "8": "en|zh,*"
+
+ignore_words:
+  - "cip"
+  - "摸鱼"
+  - "cd"
+  - "60s"
+  - ".de"
+  - ".id"
+  - "id"
+  - "我的id"
+  - "已删除"
+  - "群id"
+  - ".fy"
+  - "。fy"
+  - "fy"
+  - ".ai"
+  - "。ai"
+  - ".gg"
+  - ".gp"
+  - ".gc"
+  - "gcp"
+  - "md5转换"
+  - "ikun"
+  - "IKUN"
+  - "ping"
+  - "aichatgpt"
+  - "aichatgptc"
+  - "aidraw"
+  - "aidss"
+  - "aidsc"
+  - ".tgde"
+  - "aigeminis"
+  - "aigeminic"
+  - "aigeminip"
+  - "mp"
+  - "mpd"
+  - "ainewgpt"
+  - "ainewgptc"
+  - "ainewgptp"
+  - "ainewdraw"
