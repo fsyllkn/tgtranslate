@@ -50,6 +50,15 @@ class CommandDispatcher:
         cmd = parts[0].lower()
         args = parts[1:]
         handler = self.commands.get(cmd)
+        target_language = None
+        if handler is None:
+            # .fy-en、.fy-zh 等语言目标命令均为一次性翻译，不建立规则。
+            # 已注册的 .fy-on/.fy-off 等管理命令优先级更高，不会被这里拦截。
+            match = re.fullmatch(r"\.fy-([a-z]{2,3})", cmd)
+            if match and match.group(1) in VALID_LANGUAGE_CODES:
+                target_language = match.group(1)
+                handler = self._handle_target_now
+                args = [target_language, *args]
         import traceback
 
         # 权限控制：所有.fy 指令仅允许白名单用户
@@ -199,6 +208,7 @@ class CommandDispatcher:
             "指令帮助：\n"
             "- `.fy-main` 查看默认主语言；`.fy-main,zh` 设置；`.fy-main,off` 关闭主语言模式；\n"
             "- `.fy` / `.fy-now` 回复一条消息，临时翻译成默认主语言；优先编辑本指令显示译文，编辑失败则回复译文；\n"
+            "- `.fy-en` / `.fy-zh` 等：回复消息或在命令后跟文本，临时翻译成指定语言；支持中英文逗号和空格；\n"
             "`.fy-on/off` 对自己，`.fy-add/del` 对其他用户：\n"
             "- `.fy-on` 私聊、群聊-按“非主语言→主语言”翻译自己的消息；\n"
             "- `.fy-off` 私聊、群聊-关闭自己翻译功能；`.fy-off,primary` 仅关闭主语言规则；\n"
@@ -221,54 +231,78 @@ class CommandDispatcher:
         await send_ephemeral_reply(event, msg)
 
     async def _handle_now(self, event, args):
-        """对被回复消息执行一次性翻译，不读取或修改任何翻译规则。"""
+        """使用默认主语言对被回复消息执行一次性翻译。"""
+        await self._handle_temporary_translation(event, args, target_language=None)
+
+    async def _handle_target_now(self, event, args):
+        """使用 .fy-<语言代码> 对消息或命令后文本执行一次性翻译。"""
         from .utils import send_ephemeral_reply
 
-        if args:
-            await send_ephemeral_reply(event, "用法：回复一条消息后发送 `.fy` 或 `.fy-now`。该命令不支持修改翻译规则。")
+        if not args or args[0] not in VALID_LANGUAGE_CODES:
+            await send_ephemeral_reply(event, "用法：.fy-en 文本，或回复消息后发送 .fy-en。")
+            return
+        await self._handle_temporary_translation(event, args[1:], args[0])
+
+    async def _handle_temporary_translation(self, event, args, target_language=None):
+        """临时翻译公共流程，不读取或修改任何翻译规则。"""
+        from .utils import send_ephemeral_reply
+
+        inline_text = " ".join(args).strip()
+        if target_language is None and inline_text:
+            await send_ephemeral_reply(
+                event,
+                "用法：回复一条消息后发送 `.fy` 或 `.fy-now`；指定语言请使用 `.fy-en` 等命令。",
+            )
             return
 
         command_message = getattr(event, "message", None)
         target_message = None
-        try:
-            if command_message is not None and hasattr(command_message, "get_reply_message"):
-                target_message = await command_message.get_reply_message()
-            elif hasattr(event, "get_reply_message"):
-                target_message = await event.get_reply_message()
-        except Exception as exc:
-            logger.warning("[CommandDispatcher] 获取 .fy-now 被回复消息失败: %s", exc)
+        if not inline_text:
+            try:
+                if command_message is not None and hasattr(command_message, "get_reply_message"):
+                    target_message = await command_message.get_reply_message()
+                elif hasattr(event, "get_reply_message"):
+                    target_message = await event.get_reply_message()
+            except Exception as exc:
+                logger.warning("[CommandDispatcher] 获取临时翻译被回复消息失败: %s", exc)
 
-        if target_message is None:
-            await send_ephemeral_reply(event, "请回复一条需要翻译的文字消息后再发送 `.fy` 或 `.fy-now`。")
+        if target_message is None and not inline_text:
+            command_name = ".fy" if target_language is None else f".fy-{target_language}"
+            await send_ephemeral_reply(event, f"请回复一条需要翻译的文字消息后再发送 `{command_name}`。")
             return
 
-        # raw_text 同时覆盖普通文字和带字幕的媒体消息；没有文字的媒体不参与翻译。
-        source_text = getattr(target_message, "raw_text", None)
-        if source_text is None:
-            source_text = getattr(target_message, "text", None)
-        source_text = (source_text or "").strip()
+        # 指令后有文本时优先翻译该文本；否则翻译被回复消息。
+        if inline_text:
+            source_text = inline_text
+        else:
+            # raw_text 同时覆盖普通文字和带字幕的媒体消息。
+            source_text = getattr(target_message, "raw_text", None)
+            if source_text is None:
+                source_text = getattr(target_message, "text", None)
+            source_text = (source_text or "").strip()
         if not source_text:
             await send_ephemeral_reply(event, "被回复的消息没有可翻译文字或字幕。")
             return
 
-        primary_language = str(
-            getattr(self.bot.runtime_settings, "primary_language", "zh") or "zh"
-        ).lower()
+        if target_language is None:
+            target_language = str(
+                getattr(self.bot.runtime_settings, "primary_language", "zh") or "zh"
+            ).lower()
         prefer = self.bot.config_manager.get("default_translate_source", "deeplx")
         try:
             translated_map = await self.bot.translation_service.translate(
                 source_text,
                 "auto",
-                [primary_language],
+                [target_language],
                 prefer=prefer,
                 task="full_translation",
             )
         except Exception as exc:
-            logger.exception("[CommandDispatcher] .fy-now 翻译异常")
+            logger.exception("[CommandDispatcher] 临时翻译异常")
             await send_ephemeral_reply(event, f"临时翻译失败：{exc}")
             return
 
-        translated = (translated_map or {}).get(primary_language, "")
+        translated = (translated_map or {}).get(target_language, "")
         translated = (translated or "").strip()
         if not translated or translated.startswith("[翻译失败]"):
             await send_ephemeral_reply(event, translated or "临时翻译失败，请稍后重试。")
@@ -277,7 +311,7 @@ class CommandDispatcher:
             await send_ephemeral_reply(event, "翻译结果与原文相同，无需修改。")
             return
 
-        # 临时翻译统一编辑本次 .fy-now 指令消息。该消息本身是回复目标消息，
+        # 临时翻译统一编辑本次指令消息。该消息本身是回复目标消息时，
         # 因此编辑后仍然保持“回复目标消息”的展示关系，同时不会改写原文。
         try:
             if command_message is None or not hasattr(command_message, "edit"):
