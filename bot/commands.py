@@ -207,7 +207,7 @@ class CommandDispatcher:
         msg = (
             "指令帮助：\n"
             "- `.fy-main` 查看默认主语言；`.fy-main,zh` 设置；`.fy-main,off` 关闭主语言模式；\n"
-            "- `.fy` / `.fy-now` 回复一条消息，临时翻译成默认主语言；优先编辑本指令显示译文，编辑失败则回复译文；\n"
+            "- `.fy` / `.fy-now` 回复消息或跟随文本，临时翻译成默认主语言；优先编辑本指令显示译文，编辑失败则回复译文；\n"
             "- `.fy-en` / `.fy-zh` 等：回复消息或在命令后跟文本，临时翻译成指定语言；支持中英文逗号和空格；\n"
             "`.fy-on/off` 对自己，`.fy-add/del` 对其他用户：\n"
             "- `.fy-on` 私聊、群聊-按“非主语言→主语言”翻译自己的消息；\n"
@@ -248,12 +248,6 @@ class CommandDispatcher:
         from .utils import send_ephemeral_reply
 
         inline_text = " ".join(args).strip()
-        if target_language is None and inline_text:
-            await send_ephemeral_reply(
-                event,
-                "用法：回复一条消息后发送 `.fy` 或 `.fy-now`；指定语言请使用 `.fy-en` 等命令。",
-            )
-            return
 
         command_message = getattr(event, "message", None)
         target_message = None
