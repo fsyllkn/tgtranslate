@@ -279,10 +279,31 @@ class CommandDispatcher:
             return
 
         default_target_requested = target_language is None
+        primary_language = None
         if target_language is None:
-            target_language = str(
+            primary_language = str(
                 getattr(self.bot.runtime_settings, "primary_language", "zh") or "zh"
             ).lower()
+            target_language = primary_language
+
+        # 对 .fy 后的直接文本先做语言识别。确认文本就是默认主语言时，
+        # 直接把目标改成英语，避免先请求一次“主语言→主语言”的无效翻译。
+        direct_english = False
+        if inline_text and default_target_requested and primary_language != "en":
+            detector = getattr(self.bot, "lang_detector", None)
+            try:
+                detected, confidence = detector.detect_with_confidence(source_text)
+                fasttext_cfg = self.bot.config_manager.get("fasttext", {}) or {}
+                confidence_threshold = float(fasttext_cfg.get("confidence_threshold", 0.8))
+                if detected == primary_language and confidence >= confidence_threshold:
+                    target_language = "en"
+                    direct_english = True
+                    logger.info(
+                        "[CommandDispatcher] .fy 检测到源语言=%s 与默认主语言一致，直接翻译为英语",
+                        primary_language,
+                    )
+            except Exception as exc:
+                logger.warning("[CommandDispatcher] .fy 直接语言识别失败，继续默认翻译流程: %s", exc)
         prefer = self.bot.config_manager.get("default_translate_source", "deeplx")
         try:
             translated_map = await self.bot.translation_service.translate(
@@ -308,6 +329,7 @@ class CommandDispatcher:
         if (
             inline_text
             and default_target_requested
+            and not direct_english
             and target_language != "en"
             and translated == source_text
         ):
