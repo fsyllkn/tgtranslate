@@ -278,6 +278,7 @@ class CommandDispatcher:
             await send_ephemeral_reply(event, "被回复的消息没有可翻译文字或字幕。")
             return
 
+        default_target_requested = target_language is None
         if target_language is None:
             target_language = str(
                 getattr(self.bot.runtime_settings, "primary_language", "zh") or "zh"
@@ -301,6 +302,35 @@ class CommandDispatcher:
         if not translated or translated.startswith("[翻译失败]"):
             await send_ephemeral_reply(event, translated or "临时翻译失败，请稍后重试。")
             return
+
+        # .fy 后直接跟文本时，如果文本已经是默认主语言，按实用场景改译成英语。
+        # 指定目标语言（如 .fy-en/.fy-zh）不触发此兜底逻辑；默认主语言本身为英语时也无需重复请求。
+        if (
+            inline_text
+            and default_target_requested
+            and target_language != "en"
+            and translated == source_text
+        ):
+            logger.info(
+                "[CommandDispatcher] .fy 文本已是默认主语言 %s，改译为英语",
+                target_language,
+            )
+            try:
+                english_map = await self.bot.translation_service.translate(
+                    source_text,
+                    "auto",
+                    ["en"],
+                    prefer=prefer,
+                    task="full_translation",
+                )
+                english_text = (english_map or {}).get("en", "")
+                english_text = (english_text or "").strip()
+                if english_text and not english_text.startswith("[翻译失败]"):
+                    translated = english_text
+                    target_language = "en"
+            except Exception as exc:
+                logger.warning("[CommandDispatcher] .fy 默认主语言转英语失败: %s", exc)
+
         if translated == source_text:
             await send_ephemeral_reply(event, "翻译结果与原文相同，无需修改。")
             return
