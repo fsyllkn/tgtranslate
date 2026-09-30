@@ -286,10 +286,11 @@ class CommandDispatcher:
             ).lower()
             target_language = primary_language
 
-        # 对 .fy 后的直接文本先做语言识别。确认文本就是默认主语言时，
+        # 对 .fy 的直接文本或被回复目标先做语言识别。确认文本就是默认主语言时，
         # 直接把目标改成英语，避免先请求一次“主语言→主语言”的无效翻译。
         direct_english = False
-        if inline_text and default_target_requested and primary_language != "en":
+        has_temporary_source = bool(inline_text or target_message is not None)
+        if has_temporary_source and default_target_requested and primary_language != "en":
             detector = getattr(self.bot, "lang_detector", None)
             try:
                 detected, confidence = detector.detect_with_confidence(source_text)
@@ -324,10 +325,10 @@ class CommandDispatcher:
             await send_ephemeral_reply(event, translated or "临时翻译失败，请稍后重试。")
             return
 
-        # .fy 后直接跟文本时，如果文本已经是默认主语言，按实用场景改译成英语。
+        # 如果 .fy 的文本或回复目标已经是默认主语言，按实用场景改译成英语。
         # 指定目标语言（如 .fy-en/.fy-zh）不触发此兜底逻辑；默认主语言本身为英语时也无需重复请求。
         if (
-            inline_text
+            has_temporary_source
             and default_target_requested
             and not direct_english
             and target_language != "en"
