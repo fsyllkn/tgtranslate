@@ -46,6 +46,9 @@ cp config.sample.yaml config.yaml
 chmod 600 config.yaml
 ee config.yaml
 ```
+```sh
+编辑完成后，按 Esc 跳出 ee 菜单，默认退出编辑（Leave editor）；enter确认，再次enter确认，就保存退出编辑
+```
 
 至少检查这些配置项（以 [`config.sample.yaml`](config.sample.yaml) 为完整模板）：
 
