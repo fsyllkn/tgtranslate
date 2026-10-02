@@ -1,1 +1,4 @@
 fasttext
+Telethon
+PyYAML
+aiohttp
