@@ -1,12 +1,12 @@
 # tgtranslate — Serv00 部署指南 / Serv00 deployment guide
 
-需要连接 BotFather 创建的 Telegram bot？请使用独立的 [仅翻译 bot 部署指南](BOT_DEPLOY.md)。原有 `tg_auto_translate.py` 仍是用户账号客户端。
+`tg_auto_translate.py` 现在支持两种模式：`telegram.mode: bot` 使用 BotFather token，只提供翻译；`telegram.mode: user` 保留原有 `api_id`、`api_hash` 和用户账号会话。新配置示例默认 bot 模式，部署方法见 [仅翻译 bot 部署指南](BOT_DEPLOY.md)。下文是 user 模式的原有部署说明。
 
 [中文](#中文) · [English](#english)
 
-基于 Telethon 的 Telegram **用户账号客户端**：按聊天规则自动翻译消息，也可用 `.fy` 指令临时翻译。它使用 Telegram `api_id`、`api_hash` 和登录会话，**不使用 BotFather token**；通过长连接运行，无须配置网站、域名或入站端口。
+user 模式基于 Telethon 的 Telegram **用户账号客户端**：按聊天规则自动翻译消息，也可用 `.fy` 指令临时翻译。它使用 Telegram `api_id`、`api_hash` 和登录会话；通过长连接运行，无须配置网站、域名或入站端口。
 
-A Telethon based Telegram **user account client**. It translates messages according to chat rules and supports one off translations with `.fy` commands. It uses a Telegram `api_id`, `api_hash`, and login session, **not a BotFather token**. It runs over an outbound connection; no website, domain, or inbound port is needed.
+`tg_auto_translate.py` supports `telegram.mode: bot` for a translation-only BotFather bot and `telegram.mode: user` for the original Telethon user account client. The sample defaults to bot mode; see the [bot deployment guide](BOT_DEPLOY.md). The instructions below describe user mode, which uses `api_id`, `api_hash`, and a login session for chat rules and `.fy` commands.
 
 ## 中文
 
@@ -53,6 +53,8 @@ ee config.yaml
 ```
 
 至少检查这些配置项（以 [`config.sample.yaml`](config.sample.yaml) 为完整模板）：
+
+本节使用用户账号，请将 `telegram.mode` 设为 `user`；已有配置没有该字段时仍按 user 模式运行。
 
 | 配置 | 作用 |
 | --- | --- |
@@ -264,6 +266,8 @@ ee config.yaml
 ```
 
 Review at least these keys in [`config.sample.yaml`](config.sample.yaml):
+
+For this user account setup, set `telegram.mode: user`. Existing configs without this field also continue in user mode.
 
 | Key | Purpose |
 | --- | --- |

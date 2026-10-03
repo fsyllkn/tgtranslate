@@ -119,8 +119,9 @@ class TranslationBot:
                 await asyncio.sleep(5)
 
 
-async def main():
-    config_manager = ConfigManager("config.yaml")
+async def main(config_manager=None):
+    if config_manager is None:
+        config_manager = ConfigManager("config.yaml")
     translation_service = TranslationService(config_manager)
     async with aiohttp.ClientSession() as session:
         bot = TranslationBot(config_manager, translation_service, session)

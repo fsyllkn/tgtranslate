@@ -2,13 +2,17 @@
 # config.yaml contains secrets and is intentionally excluded from Git.
 
 telegram:
+  # bot: BotFather token；user: 原有 api_id/api_hash 用户账号登录。
+  mode: "bot"
+  # 下列凭据仅在 user 模式使用，保留原有用法。
   api_id: 12345678
   api_hash: "YOUR_TELEGRAM_API_HASH"
   session_name: "translate"
+  # 仅 user 模式下允许使用 .fy 指令的数字用户 ID。
   my_tg_ids:
     - 123456789
 
-# 独立 BotFather bot 入口 telegram_translate_bot.py 使用下列设置。
+# bot 模式使用下列设置。
 # token 优先从 TELEGRAM_BOT_TOKEN 环境变量读取，请勿提交真实 token。
 telegram_bot:
   source_language: "auto"
