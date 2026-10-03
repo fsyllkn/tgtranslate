@@ -121,6 +121,84 @@ SSH 断开后可用 `ps -u "$USER" -o pid,command | grep '[t]g_auto_translate.py
 
 `@reboot` 只在服务器重启时启动；进程之后异常退出时，需要手动检查日志并重启。请遵守 Serv00 的进程和资源限制。
 
+### 5. 进程保活 / Process watchdog
+
+保活脚本不能阻止 Serv00 或系统终止进程；它只会定时检查进程是否存在，发现进程消失后重新创建 tmux 会话。每 5 分钟检查一次，异常退出后的恢复时间最长约 5 分钟。
+
+创建 ~/bin/check_tgtranslate.sh：
+
+~~~sh
+mkdir -p ~/bin
+nano ~/bin/check_tgtranslate.sh
+~~~
+
+写入：
+
+~~~sh
+#!/bin/sh
+
+APP_DIR="$HOME/tgtranslate"
+PYTHON="$HOME/.virtualenvs/tgtranslate/bin/python"
+SESSION="tgtranslate"
+LOG="$APP_DIR/bot.log"
+WATCHDOG_LOG="$APP_DIR/watchdog.log"
+ME="$(id -un)"
+
+# ps/awk 比 pgrep -u 更适合不同的 Serv00 shell 环境。
+if ps auxww | awk -v me="$ME" \
+    '$1 == me && /[p]ython[^ ]* .*tg_auto_translate[.]py/ { found=1 }
+     END { exit(found ? 0 : 1) }'
+then
+    printf '%s process ok\n' "$(date '+%F %T')" >> "$WATCHDOG_LOG"
+    exit 0
+fi
+
+printf '%s process missing, restarting\n' "$(date '+%F %T')" >> "$WATCHDOG_LOG"
+
+if tmux has-session -t "$SESSION" 2>/dev/null; then
+    tmux kill-session -t "$SESSION"
+fi
+
+tmux new-session -d -s "$SESSION" \
+    "cd '$APP_DIR' && exec '$PYTHON' -u tg_auto_translate.py >> '$LOG' 2>&1"
+~~~
+
+然后：
+
+~~~sh
+chmod +x ~/bin/check_tgtranslate.sh
+~/bin/check_tgtranslate.sh
+tail -n 5 ~/tgtranslate/watchdog.log
+~~~
+
+正常运行时应看到 process ok。如果脚本报告 process missing, restarting，但下面命令能看到 Python 进程，应先修正检查脚本，不要启用 cron，以免误杀正常的 tmux 会话：
+
+~~~sh
+ps auxww | grep '[t]g_auto_translate.py'
+tmux ls
+~~~
+
+将原来直接启动 Python 的 @reboot 行替换为以下两行。把 /home/LOGIN 替换成 echo "$HOME" 输出的实际路径：
+
+~~~cron
+*/5 * * * * /usr/local/bin/flock /home/LOGIN/tgtranslate/watchdog.lock /home/LOGIN/bin/check_tgtranslate.sh >> /home/LOGIN/tgtranslate/cron.log 2>&1
+@reboot /home/LOGIN/bin/check_tgtranslate.sh
+~~~
+
+flock 防止检查任务重叠。只保留一组 watchdog cron；不要同时使用 screen、多个 tmux 会话、多个 @reboot、手动启动和 watchdog 启动，否则可能产生多个 Telegram session 进程。
+
+保活只能恢复“进程不存在”的情况，不能判断 Python 已经卡住或 Telegram 连接已失效。如果 Serv00 账号被封、Processes/RAM 达到限制，watchdog 也可能无法启动新进程。Account is now banned in <channel> 是 Telegram 对特定频道的访问限制，不是 Serv00 进程故障，重启不能解除。
+
+查看资源：
+
+~~~sh
+ps auxww | awk -v u="$USER" '$1 == u {rss += $6; cpu += $3; n++} END {printf "processes=%d CPU=%.1f%% RSS=%.1f MB\n", n, cpu, rss/1024}'
+tail -f ~/tgtranslate/watchdog.log
+~~~
+
+RSS 是实际内存，VSZ 是虚拟地址空间；不要把 VSZ 当作实际 RAM。重点观察 RSS 是否持续增长，以及 DevilWEB 的 Processes/RAM 是否接近 100%。
+
+
 ### 更新与常见问题
 
 更新前先停止旧进程，再执行：
@@ -253,6 +331,84 @@ For startup after a server reboot, run `crontab -e` and add this line, replacing
 ```
 
 `@reboot` runs only after a server reboot. If the process later exits, inspect the log and restart it manually. Respect Serv00 process and resource limits.
+
+### 5. Process watchdog
+
+The watchdog cannot prevent Serv00 or the operating system from terminating a process. It periodically checks whether the process exists and recreates the tmux session if it is gone. With a five-minute schedule, recovery after an unexpected exit can take up to about five minutes.
+
+Create ~/bin/check_tgtranslate.sh:
+
+~~~sh
+mkdir -p ~/bin
+nano ~/bin/check_tgtranslate.sh
+~~~
+
+Paste:
+
+~~~sh
+#!/bin/sh
+
+APP_DIR="$HOME/tgtranslate"
+PYTHON="$HOME/.virtualenvs/tgtranslate/bin/python"
+SESSION="tgtranslate"
+LOG="$APP_DIR/bot.log"
+WATCHDOG_LOG="$APP_DIR/watchdog.log"
+ME="$(id -un)"
+
+# ps/awk is more reliable than pgrep -u across Serv00 shell environments.
+if ps auxww | awk -v me="$ME" \
+    '$1 == me && /[p]ython[^ ]* .*tg_auto_translate[.]py/ { found=1 }
+     END { exit(found ? 0 : 1) }'
+then
+    printf '%s process ok\n' "$(date '+%F %T')" >> "$WATCHDOG_LOG"
+    exit 0
+fi
+
+printf '%s process missing, restarting\n' "$(date '+%F %T')" >> "$WATCHDOG_LOG"
+
+if tmux has-session -t "$SESSION" 2>/dev/null; then
+    tmux kill-session -t "$SESSION"
+fi
+
+tmux new-session -d -s "$SESSION" \
+    "cd '$APP_DIR' && exec '$PYTHON' -u tg_auto_translate.py >> '$LOG' 2>&1"
+~~~
+
+Then run:
+
+~~~sh
+chmod +x ~/bin/check_tgtranslate.sh
+~/bin/check_tgtranslate.sh
+tail -n 5 ~/tgtranslate/watchdog.log
+~~~
+
+A healthy check should report process ok. If it reports process missing, restarting while the following commands show a running Python process, fix the check before enabling cron; otherwise a healthy tmux session may be killed:
+
+~~~sh
+ps auxww | grep '[t]g_auto_translate.py'
+tmux ls
+~~~
+
+Replace the existing direct-Python @reboot line with these two lines. Replace /home/LOGIN with the actual path printed by echo "$HOME":
+
+~~~cron
+*/5 * * * * /usr/local/bin/flock /home/LOGIN/tgtranslate/watchdog.lock /home/LOGIN/bin/check_tgtranslate.sh >> /home/LOGIN/tgtranslate/cron.log 2>&1
+@reboot /home/LOGIN/bin/check_tgtranslate.sh
+~~~
+
+flock prevents overlapping checks. Keep only one watchdog configuration. Do not combine multiple screen sessions, multiple tmux sessions, multiple @reboot entries, manual starts, and watchdog starts, or multiple Telegram session processes may be created.
+
+The watchdog only recovers a missing process. It cannot detect a hung Python process or a dead Telegram connection. If the Serv00 account is blocked or its Processes/RAM limits are reached, the watchdog may also be unable to start a replacement. Account is now banned in <channel> is a Telegram restriction for a specific channel, not a Serv00 process failure; restarting cannot remove it.
+
+Check resource usage with:
+
+~~~sh
+ps auxww | awk -v u="$USER" '$1 == u {rss += $6; cpu += $3; n++} END {printf "processes=%d CPU=%.1f%% RSS=%.1f MB\n", n, cpu, rss/1024}'
+tail -f ~/tgtranslate/watchdog.log
+~~~
+
+RSS is resident memory and VSZ is virtual address space; do not treat VSZ as physical RAM. Watch for steadily growing RSS and for Processes/RAM approaching 100% in DevilWEB.
+
 
 ### Updating and troubleshooting
 
