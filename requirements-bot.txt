@@ -1,0 +1,3 @@
+# Bot API entrypoint does not need Telethon or fastText.
+aiohttp
+PyYAML

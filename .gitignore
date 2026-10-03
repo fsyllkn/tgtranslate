@@ -14,6 +14,8 @@ lid.176.bin
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.venv/
+.uv-cache/
 *.log
 
 # Local/editor/system files

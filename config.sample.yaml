@@ -8,6 +8,14 @@ telegram:
   my_tg_ids:
     - 123456789
 
+# 独立 BotFather bot 入口 telegram_translate_bot.py 使用下列设置。
+# token 优先从 TELEGRAM_BOT_TOKEN 环境变量读取，请勿提交真实 token。
+telegram_bot:
+  source_language: "auto"
+  target_language: "zh"
+  # 留空允许所有私聊用户；建议填写自己的 Telegram 数字用户 ID 以限制 API 用量。
+  allowed_user_ids: []
+
 # Default translation source: gemini, openai, or deeplx
 default_translate_source: "gemini"
 

@@ -1,5 +1,7 @@
 # tgtranslate — Serv00 部署指南 / Serv00 deployment guide
 
+需要连接 BotFather 创建的 Telegram bot？请使用独立的 [仅翻译 bot 部署指南](BOT_DEPLOY.md)。原有 `tg_auto_translate.py` 仍是用户账号客户端。
+
 [中文](#中文) · [English](#english)
 
 基于 Telethon 的 Telegram **用户账号客户端**：按聊天规则自动翻译消息，也可用 `.fy` 指令临时翻译。它使用 Telegram `api_id`、`api_hash` 和登录会话，**不使用 BotFather token**；通过长连接运行，无须配置网站、域名或入站端口。

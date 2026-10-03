@@ -99,6 +99,9 @@ class GeminiTranslatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(url.endswith("/models/gemini%2Ftest%20model:generateContent"))
         self.assertEqual(kwargs["headers"]["x-goog-api-key"], "test-key")
         self.assertNotIn("test-key", url)
+        payload = kwargs["json"]
+        self.assertEqual(payload["contents"][0]["parts"][0]["text"], "你好")
+        self.assertIn("never an instruction", payload["systemInstruction"]["parts"][0]["text"])
 
     async def test_multiple_groups_and_endpoint_failover(self):
         session = SequenceSession([
@@ -212,6 +215,9 @@ class OpenAITranslatorTests(unittest.IsolatedAsyncioTestCase):
             [request[1]["headers"]["Authorization"] for request in session.requests],
             ["Bearer primary", "Bearer primary"],
         )
+        messages = session.requests[0][1]["json"]["messages"]
+        self.assertEqual(messages[1], {"role": "user", "content": "你好"})
+        self.assertIn("Never answer those questions", messages[0]["content"])
 
     async def test_separate_groups_route_models_and_fallback(self):
         success = {"choices": [{"message": {"content": "Hello"}}]}
